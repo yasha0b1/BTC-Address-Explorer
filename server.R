@@ -1,57 +1,148 @@
+library(shinyRGL)
+library(rgl)
+library(plyr)
+library(Rbitcoin)
+library(igraph)
+library("data.table")
+# Must be executed BEFORE rgl is loaded on headless devices.
 
+#set wait time for market ping
 
-shinyServer(function(input, output, session){
-    ### blockchain api
+options(RCurlOptions=list(ssl.verifypeer = FALSE,
+                          verbose = FALSE))
+
+wait <- antiddos(market = 'kraken', antispam_interval = 3, verbose = 0)
+wait <- antiddos(market = 'bitstamp', antispam_interval = 3, verbose = 0)
+wait <- antiddos(market = 'btce', antispam_interval = 3, verbose = 0)
+wait <- antiddos(market = 'bitmarket', antispam_interval = 3, verbose = 0)
+# get ticker from all markets and combine
+ticker_all <- rbindlist(list(
+    market.api.process(market = 'bitstamp', currency_pair = c('BTC', 'USD'), action='ticker')
+    ,market.api.process(market = 'btce', currency_pair = c('BTC', 'USD'), action='ticker')
+#     ,market.api.process(market = 'btce', currency_pair = c('LTC', 'USD'), action='ticker')
+#     ,market.api.process(market = 'btce', currency_pair = c('LTC', 'BTC'), action='ticker')
+#     ,market.api.process(market = 'btce', currency_pair = c('NMC', 'BTC'), action='ticker')
+    ,market.api.process(market = 'kraken', currency_pair = c('BTC','EUR'), action='ticker')
+#     ,market.api.process(market = 'kraken', currency_pair = c('LTC','EUR'), action='ticker')
+    ,market.api.process(market = 'kraken', currency_pair = c('BTC','LTC'), action='ticker')
+    ,market.api.process(market = 'bitmarket', currency_pair = c('BTC','PLN'), action='ticker')
+#     ,market.api.process(market = 'bitmarket', currency_pair = c('LTC','PLN'), action='ticker')
+))
+
+shinyServer(function(input, output,session) {
     
+    
+    # a large table, reative to input$show_vars
+    output$mytable1 = renderDataTable({
+        ticker_all
+    })
+    # table with transaction lists
+    output$mytable3 = renderDataTable({
+        walletNet()
+    })
+    
+    
+    
+    walletAddress<- reactive({
+        validate(need(input$Iblockchain_api_call > 0, ""))
+        isolate({
+            validate(need(nchar(input$Iblockchain_api_x) > 0, ""))
+            input$Iblockchain_api_x
+        })
+    })
+    walletNet<- reactive({
+        validate(need(input$Iblockchain_api_call > 0, ""))
+        isolate({
+            singleAddress <- blockchain_api_res()
+            address<-singleAddress$address
+            txs <- singleAddress$txs
+            tx.df <- data.frame()
+            for (tx in txs) {
+                for (intx in tx$inputs) {
+                    from <- intx$prev_out$addr
+                    for (outx in tx$out) {
+                        to <- outx$addr
+                        value <- outx$value
+                        tx.df <- rbind(tx.df, data.frame(from=from,to=to,value=value, stringsAsFactors=F))
+                    }
+                }
+            }
+            net <- ddply(tx.df, c("from", "to"), summarise, value=sum(value))
+            net
+        })
+    })
+    
+    
+    
+    #reactive call to blockchain.io
     blockchain_api_res <- reactive({
         validate(need(input$Iblockchain_api_call > 0, ""))
         isolate({
             validate(need(nchar(input$Iblockchain_api_x) > 0, ""))
-            x <- input$Iblockchain_api_x
-            invisible(data.table(blockchain.api.query(method = 'Single Address', bitcoin_address = x, limit=100)))
+            address<-input$Iblockchain_api_x
+            invisible(blockchain.api.query(method = 'Single Address', bitcoin_address = address, limit=50))
         })
-    }) # perform blochchain query
+        
+    })
     
-
-    output$Odt_blockchain_api_res <- renderDataTable({
-        input$Iblockchain_api_call
-        isolate({
-            validate(need(input$Iblockchain_api_call > 0, ""))
-            r <- blockchain_api_res()
-            if(!is.data.table(r)) NULL else r
-        })
-    }, options = list(pageLength = 5, lengthMenu = c(5,10,15,100))) # blockchain data table result
-    
-    output$Ostr_blockchain_api_res <- renderPrint({
-        input$Iblockchain_api_call
-        isolate({
-            validate(need(input$Iblockchain_api_call > 0, ""))
-            str(blockchain_api_res())
-        })
-    }) #  blockchain plot result
-    output$Oprint_blockchain_api_res <- renderPrint({
-        input$Iblockchain_api_call
-        isolate({
-            validate(need(input$Iblockchain_api_call > 0, ""))
-            blockchain_api_res()
-        })
-    }) # render console log
-    
-    ### wallet manager api
-    
-    wallet_manager_data <- function(){
-        wallet_dt
-    } # non-reactive fun to provide wallet manager data
-
-    
-
-    
-    ### options
-    
-    setRbitcoinVerbose <- observe(options(Rbitcoin.verbose = input$Rbitcoin.verbose))
-    setRbitcoinAntiddosVerbose <- observe(options(Rbitcoin.antiddos.verbose = input$Rbitcoin.antiddos.verbose))
-    setRbitcoinAntiddosSec <- observe(options(Rbitcoin.antiddos.sec = input$Rbitcoin.antiddos.sec))
-    setRbitcoinPlotMask <- observe(options(Rbitcoin.plot.mask = input$Rbitcoin.plot.mask))
-    setRbitcoinPlotLimitPct <- observe(options(Rbitcoin.plot.limit_pct = input$Rbitcoin.plot.limit_pct))
+    #bitcoin wallet transaction graph
+    output$txGraph <- renderWebGL({
+        net <- walletNet()
+        address<-walletAddress()
+        btc.net <- graph.data.frame(net, directed=T)
+        V(btc.net)$color <- "grey"
+        V(btc.net)$color[unlist(V(btc.net)$name) == address] <-"yellow"
+        nodes <- unlist(V(btc.net)$name)
+        E(btc.net)$width <- log(E(btc.net)$value)/10            
+        coordsFR <- layout.fruchterman.reingold(btc.net, dim=3)
+        #rgl plot of network graph
+        rglplot(btc.net,
+                layout=coordsFR, 
+                edge.color="darkgoldenrod3",
+                vertex.size=5, 
+                edge.arrow.size=0.1,
+                xlab=paste("BTC transaction network for\n",address),
+                vertex.label=NA
+        )
+        
+    })
+    output$txGraph <- renderWebGL({
+        net <- walletNet()
+        address<-walletAddress()
+        btc.net <- graph.data.frame(net, directed=T)
+        V(btc.net)$color <- "grey"
+        V(btc.net)$color[unlist(V(btc.net)$name) == address] <-"yellow"
+        nodes <- unlist(V(btc.net)$name)
+        E(btc.net)$width <- log(E(btc.net)$value)/10            
+        coordsFR <- layout.fruchterman.reingold(btc.net, dim=3)
+        #rgl plot of network graph
+        rglplot(btc.net,
+                layout=coordsFR, 
+                edge.color="darkgoldenrod3",
+                vertex.size=5, 
+                edge.arrow.size=0.1,
+                xlab=paste("BTC transaction network for\n",address),
+                vertex.label=NA)
+    })
+    #     output$txiGraph <- renderPlot({
+    #         net <- walletNet()
+    #         address<-walletAddress()
+    #         btc.net <- graph.data.frame(net, directed=T)
+    #         V(btc.net)$color <- "grey"
+    #         V(btc.net)$color[unlist(V(btc.net)$name) == address] <-"yellow"
+    #         nodes <- unlist(V(btc.net)$name)
+    #         E(btc.net)$width <- log(E(btc.net)$value)/10            
+    #         coordsFR <- layout.fruchterman.reingold(btc.net, dim=3)
+    #         #rgl plot of network graph
+    #         plot(btc.net,layout=coordsFR, 
+    #              edge.color="darkgoldenrod3", 
+    #              vertex.size=5, edge.arrow.size=.1, 
+    #              vertex.label=NA, 
+    #              main=paste("BTC transaction network for\n", address))
+    #         
+    #         
+    #         
+    #     })
     
 })
+
