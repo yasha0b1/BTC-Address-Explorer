@@ -14,7 +14,7 @@ shinyUI(pageWithSidebar(
                  actionButton("Iblockchain_api_call", label = "Explorer Blockchain")
     ),
     
-    # Show the generated 3d scatterplot
+    # Show the generated 3d scatterplot and Transaction history
     mainPanel(
         
         tabsetPanel(id="PlotView",
