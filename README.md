@@ -18,6 +18,10 @@ View the code the in action
 
 [igraph](https://github.com/igraph/rigraph) igraph R package
 
+#### Credits
+
+[Querying the Bitcoin blockchain with R](http://beautifuldata.net/2015/01/querying-the-bitcoin-blockchain-with-r/) Based upon example code from Benedikt Koehler
+
 
 
 
