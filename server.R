@@ -38,7 +38,9 @@ shinyServer(function(input, output,session) {
     })
     # table with transaction lists
     output$mytable3 = renderDataTable({
-        walletNet()
+        net<-walletNet()
+        net$value=net$value/100000000
+        net
     })
     
     
@@ -78,9 +80,10 @@ shinyServer(function(input, output,session) {
     blockchain_api_res <- reactive({
         validate(need(input$Iblockchain_api_call > 0, ""))
         isolate({
+            
             validate(need(nchar(input$Iblockchain_api_x) > 0, ""))
             address<-input$Iblockchain_api_x
-            invisible(blockchain.api.query(method = 'Single Address', bitcoin_address = address, limit=50))
+            invisible(blockchain.api.query(method = 'Single Address', bitcoin_address = address, limit=25))
         })
         
     })
@@ -119,30 +122,15 @@ shinyServer(function(input, output,session) {
         rglplot(btc.net,
                 layout=coordsFR, 
                 edge.color="darkgoldenrod3",
-                vertex.size=5, 
+                edge.curved = TRUE,
                 edge.arrow.size=0.1,
-                xlab=paste("BTC transaction network for\n",address),
+                vertex.size=5, 
                 vertex.label=NA)
+        title3d( main=paste('BTC transaction network for',address))
+        
+        
     })
-    #     output$txiGraph <- renderPlot({
-    #         net <- walletNet()
-    #         address<-walletAddress()
-    #         btc.net <- graph.data.frame(net, directed=T)
-    #         V(btc.net)$color <- "grey"
-    #         V(btc.net)$color[unlist(V(btc.net)$name) == address] <-"yellow"
-    #         nodes <- unlist(V(btc.net)$name)
-    #         E(btc.net)$width <- log(E(btc.net)$value)/10            
-    #         coordsFR <- layout.fruchterman.reingold(btc.net, dim=3)
-    #         #rgl plot of network graph
-    #         plot(btc.net,layout=coordsFR, 
-    #              edge.color="darkgoldenrod3", 
-    #              vertex.size=5, edge.arrow.size=.1, 
-    #              vertex.label=NA, 
-    #              main=paste("BTC transaction network for\n", address))
-    #         
-    #         
-    #         
-    #     })
+
     
 })
 
