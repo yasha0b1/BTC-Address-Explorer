@@ -102,26 +102,6 @@ shinyServer(function(input, output,session) {
         rglplot(btc.net,
                 layout=coordsFR, 
                 edge.color="darkgoldenrod3",
-                vertex.size=5, 
-                edge.arrow.size=0.1,
-                xlab=paste("BTC transaction network for\n",address),
-                vertex.label=NA
-        )
-        
-    })
-    output$txGraph <- renderWebGL({
-        net <- walletNet()
-        address<-walletAddress()
-        btc.net <- graph.data.frame(net, directed=T)
-        V(btc.net)$color <- "grey"
-        V(btc.net)$color[unlist(V(btc.net)$name) == address] <-"yellow"
-        nodes <- unlist(V(btc.net)$name)
-        E(btc.net)$width <- log(E(btc.net)$value)/10            
-        coordsFR <- layout.fruchterman.reingold(btc.net, dim=3)
-        #rgl plot of network graph
-        rglplot(btc.net,
-                layout=coordsFR, 
-                edge.color="darkgoldenrod3",
                 edge.curved = TRUE,
                 edge.arrow.size=0.1,
                 vertex.size=5, 
