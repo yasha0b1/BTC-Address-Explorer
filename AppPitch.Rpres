@@ -1,0 +1,139 @@
+Visual BTC Address Explorer
+========================================================
+author: Jacob Govshteyn
+date: `r date()`
+
+```{r setup, results='asis',echo=FALSE}
+library(knitr)
+knit_hooks$set(webgl = hook_webgl)
+
+```
+
+Bitcoin is a Beautiful Technology 
+========================================================
+
+[1EhXj3KkhvzFPqbkHib7Bx8Zdn1GaviQnF](https://blockchain.info/address/1EhXj3KkhvzFPqbkHib7Bx8Zdn1GaviQnF) 
+
+ 
+![alt text](http://i.imgur.com/ZqHu7Yg.png)
+
+
+
+BTC Transactions are Inherently Ugly
+========================================================
+
+<font size="4">
+>Input:
+>Previous tx: f5d8ee39a430901c91a5917b9f2dc19d6d1a0e9cea205b009ca73dd04470b9a6
+>Index: 0
+>scriptSig: 304502206e21798a42fae0e854281abd38bacd1aeed3ee3738d9e1446618c4571d10
+>90db022100e2ac980643b0b82c0e88ffdfec6b64e3e6ba35e7ba5fdd7d5d6cc8d25c6b241501
+
+![alt text](http://upload.wikimedia.org/wikipedia/commons/7/7f/Bitcoin_Transaction_Inputs_and_Outputs.png)
+
+>Output:
+>Value: 5000000000
+>scriptPubKey: OP_DUP OP_HASH160 404371705fa9bd789a2fcd52d2c580b65d35549d
+>OP_EQUALVERIFY OP_CHECKSIG
+</font> 
+
+
+
+Visualize Transactions with iGraph
+====================================
+
+
+
+```{r,echo=FALSE}
+library(plyr)
+library(Rbitcoin)
+library(igraph)
+        address<-'1EhXj3KkhvzFPqbkHib7Bx8Zdn1GaviQnF'
+        singleAddress <- blockchain.api.query(method = 'Single Address', bitcoin_address = address, limit=25)
+
+            txs <- singleAddress$txs
+            tx.df <- data.frame()
+            for (tx in txs) {
+                for (intx in tx$inputs) {
+                    from <- intx$prev_out$addr
+                    for (outx in tx$out) {
+                        to <- outx$addr
+                        value <- outx$value
+                        tx.df <- rbind(tx.df, data.frame(from=from,to=to,value=value, stringsAsFactors=F))
+                    }
+                }
+            }
+            net <- ddply(tx.df, c("from", "to"), summarise, value=sum(value))
+
+
+
+        btc.net <- graph.data.frame(net, directed=T)
+        V(btc.net)$color <- "grey"
+        V(btc.net)$color[unlist(V(btc.net)$name) == address] <-"yellow"
+        nodes <- unlist(V(btc.net)$name)
+        E(btc.net)$width <- log(E(btc.net)$value)/10            
+        coordsFR <- layout.fruchterman.reingold(btc.net, dim=3)
+        #rgl plot of network graph
+        plot(btc.net,
+                layout=coordsFR, 
+                edge.color="darkgoldenrod3",
+                edge.curved = TRUE,
+                edge.arrow.size=0.1,
+                main=paste('BTC transaction network for',address),
+                vertex.size=5, 
+                vertex.label=NA)
+        
+
+
+```
+
+3D Rendered iGraph
+====================================
+
+<small>(Give it a twirl)</small>
+
+
+
+```{r,echo=FALSE,webgl=TRUE}
+library(rgl)
+library(plyr)
+library(Rbitcoin)
+library(igraph)
+        address<-'1EhXj3KkhvzFPqbkHib7Bx8Zdn1GaviQnF'
+        singleAddress <- blockchain.api.query(method = 'Single Address', bitcoin_address = address, limit=25)
+
+            txs <- singleAddress$txs
+            tx.df <- data.frame()
+            for (tx in txs) {
+                for (intx in tx$inputs) {
+                    from <- intx$prev_out$addr
+                    for (outx in tx$out) {
+                        to <- outx$addr
+                        value <- outx$value
+                        tx.df <- rbind(tx.df, data.frame(from=from,to=to,value=value, stringsAsFactors=F))
+                    }
+                }
+            }
+            net <- ddply(tx.df, c("from", "to"), summarise, value=sum(value))
+
+
+
+        btc.net <- graph.data.frame(net, directed=T)
+        V(btc.net)$color <- "grey"
+        V(btc.net)$color[unlist(V(btc.net)$name) == address] <-"yellow"
+        nodes <- unlist(V(btc.net)$name)
+        E(btc.net)$width <- log(E(btc.net)$value)/10            
+        coordsFR <- layout.fruchterman.reingold(btc.net, dim=3)
+        #rgl plot of network graph
+        rglplot(btc.net,
+                layout=coordsFR, 
+                edge.color="darkgoldenrod3",
+                edge.curved = TRUE,
+                edge.arrow.size=0.1,
+                vertex.size=5, 
+                vertex.label=NA)
+        title3d( main=paste('BTC transaction network for',address))
+        
+
+
+```
