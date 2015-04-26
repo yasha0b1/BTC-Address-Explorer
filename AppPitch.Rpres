@@ -37,7 +37,7 @@ BTC Transactions are Inherently Ugly
 >OP_EQUALVERIFY OP_CHECKSIG
 </font> 
 
-
+<font size="2">https://commons.wikimedia.org/wiki/File:Bitcoin_Transaction_Inputs_and_Outputs.png</font>
 
 Visualize Transactions with iGraph
 ====================================
@@ -87,53 +87,4 @@ library(igraph)
 
 ```
 
-3D Rendered iGraph
-====================================
 
-<small>(Give it a twirl)</small>
-
-
-
-```{r,echo=FALSE,webgl=TRUE}
-library(rgl)
-library(plyr)
-library(Rbitcoin)
-library(igraph)
-        address<-'1EhXj3KkhvzFPqbkHib7Bx8Zdn1GaviQnF'
-        singleAddress <- blockchain.api.query(method = 'Single Address', bitcoin_address = address, limit=25)
-
-            txs <- singleAddress$txs
-            tx.df <- data.frame()
-            for (tx in txs) {
-                for (intx in tx$inputs) {
-                    from <- intx$prev_out$addr
-                    for (outx in tx$out) {
-                        to <- outx$addr
-                        value <- outx$value
-                        tx.df <- rbind(tx.df, data.frame(from=from,to=to,value=value, stringsAsFactors=F))
-                    }
-                }
-            }
-            net <- ddply(tx.df, c("from", "to"), summarise, value=sum(value))
-
-
-
-        btc.net <- graph.data.frame(net, directed=T)
-        V(btc.net)$color <- "grey"
-        V(btc.net)$color[unlist(V(btc.net)$name) == address] <-"yellow"
-        nodes <- unlist(V(btc.net)$name)
-        E(btc.net)$width <- log(E(btc.net)$value)/10            
-        coordsFR <- layout.fruchterman.reingold(btc.net, dim=3)
-        #rgl plot of network graph
-        rglplot(btc.net,
-                layout=coordsFR, 
-                edge.color="darkgoldenrod3",
-                edge.curved = TRUE,
-                edge.arrow.size=0.1,
-                vertex.size=5, 
-                vertex.label=NA)
-        title3d( main=paste('BTC transaction network for',address))
-        
-
-
-```
